@@ -1,106 +1,122 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import altair as alt
+import folium
+from streamlit_folium import st_folium
+import random
 
-st.set_page_config(page_title="스마트 응급 자원 배분 앱", layout="wide")
+st.set_page_config(page_title="스마트 응급 자원 배분", layout="wide")
 
-# 제목
-st.title("🚑 스마트 응급 자원 배분 앱")
-st.markdown("### 보건 × 경영 융합 프로젝트")
+st.title("🚑 스마트 응급 자원 배분 시스템")
 
-# 지역 선택
-regions = [
-    "서울 강남", "서울 강북", "부산 서부", "부산 동부",
-    "대구 남구", "대구 북구", "인천 연수구", "인천 부평구",
-    "광주 동구", "광주 서구", "광주 남구", "광주 북구", "광주 광산구",
-    "대전 유성구", "울산 중구", "세종시",
-    "경기 수원", "경기 성남", "강원 춘천", "충북 청주", "충남 천안",
-    "전북 전주", "전남 목포", "경북 포항", "경남 창원", "제주 제주시"
-]
-
-with st.sidebar:
-    st.header("⚙️ 설정")
-    region = st.selectbox("지역을 선택하세요", regions)
-    emergency_type = st.selectbox(
-        "응급 상황을 선택하세요",
-        ["심정지", "출혈", "골절", "화상", "호흡곤란", "저체온증", "중독", "경련"]
-    )
-    priority = st.radio("추천 기준", ["대기시간", "가용병상"])
-
-# 데이터 생성 함수
-def generate_hospital_data(region, n=7):
-    np.random.seed(len(region))
-    return pd.DataFrame({
-        "병원명": [f"{region} 병원 {i+1}" for i in range(n)],
-        "대기환자": np.random.randint(0, 50, n),
-        "가용병상": np.random.randint(0, 20, n),
-        "위도": np.random.uniform(35.0, 37.5, n),
-        "경도": np.random.uniform(126.5, 129.5, n)
-    })
-
-hospital_data = generate_hospital_data(region)
-
-# 응급 처치 가이드
-treatment_guide = {
-    "심정지": "즉시 심폐소생술(CPR)을 시행하고 자동심장충격기(AED) 사용",
-    "출혈": "출혈 부위를 압박하여 지혈하고 필요시 지혈대 사용",
-    "골절": "부목으로 고정 후 환자를 움직이지 않게 안정",
-    "화상": "상처 부위를 10분 이상 흐르는 물에 식히고 물집은 터뜨리지 않음",
-    "호흡곤란": "환자를 편하게 앉히고 기도 확보, 필요시 인공호흡 준비",
-    "저체온증": "젖은 옷을 벗기고 담요로 감싸 체온 유지",
-    "중독": "원인 물질 확인 후, 구토 유발 금지. 즉시 의료기관 이송",
-    "경련": "환자를 안전한 곳으로 옮기고 머리를 보호, 억지로 움직이지 않음"
+# 지역별 실제 병원 데이터
+hospital_dict = {
+    "서울 강남": ["서울아산병원", "삼성서울병원", "서울성모병원", "강남세브란스병원"],
+    "서울 강북": ["강북삼성병원", "고려대학교안암병원", "서울적십자병원"],
+    "부산 동구": ["부산대학교병원", "동아대학교병원", "고신대학교복음병원"],
+    "대구 북구": ["경북대학교병원", "대구가톨릭대학교병원", "칠곡경북대학교병원"],
+    "대구 남구": ["영남대학교병원", "대구파티마병원"],
+    "광주 서구": ["조선대학교병원", "광주기독병원", "광주한국병원"],
+    "광주 동구": ["전남대학교병원", "광주적십자병원"],
+    "광주 남구": ["광주보훈병원", "광주희망병원"],
+    "광주 북구": ["전남대학교병원", "조선대학교병원", "광주보훈병원"],
+    "광주 광산구": ["KS병원", "첨단종합병원"],
+    "대전 유성구": ["충남대학교병원", "대전을지대학교병원"],
+    "인천 연수구": ["가천대길병원", "인천적십자병원"],
+    "인천 부평구": ["인하대학교병원", "가톨릭관동대학교국제성모병원"],
+    "울산 중구": ["울산대학교병원", "울산병원"],
+    "세종": ["세종병원", "세종충남대학교병원"],
+    "경기 수원": ["아주대학교병원", "성빈센트병원"],
+    "경기 성남": ["분당서울대학교병원", "성남시의료원"],
+    "강원 춘천": ["강원대학교병원", "한림대학교춘천성심병원"],
+    "강원 원주": ["원주세브란스기독병원", "한라대학교병원"],
+    "충북 청주": ["충북대학교병원", "청주성모병원"],
+    "충남 천안": ["단국대학교병원", "순천향대학교천안병원"],
+    "전북 전주": ["전북대학교병원", "예수병원"],
+    "전남 목포": ["목포한국병원", "목포시의료원"],
+    "경북 포항": ["포항세명기독병원", "포항성모병원"],
+    "경남 창원": ["창원경상국립대학교병원", "창원파티마병원"],
+    "제주 제주시": ["제주대학교병원", "한라병원"]
 }
 
-# 추천 병원 선정
-if priority == "대기시간":
-    recommended = hospital_data.sort_values("대기환자").iloc[0]
-else:
-    recommended = hospital_data.sort_values("가용병상", ascending=False).iloc[0]
+# 좌표 (예시값)
+coordinates = {
+    "서울 강남": [37.4979, 127.0276],
+    "서울 강북": [37.6101, 127.0293],
+    "부산 동구": [35.1293, 129.0450],
+    "대구 북구": [35.8890, 128.5820],
+    "대구 남구": [35.8452, 128.6007],
+    "광주 서구": [35.1460, 126.8526],
+    "광주 동구": [35.1465, 126.9230],
+    "광주 남구": [35.1330, 126.9020],
+    "광주 북구": [35.1744, 126.9110],
+    "광주 광산구": [35.1399, 126.7930],
+    "대전 유성구": [36.3622, 127.3565],
+    "인천 연수구": [37.4105, 126.6788],
+    "인천 부평구": [37.5070, 126.7218],
+    "울산 중구": [35.5666, 129.3385],
+    "세종": [36.4801, 127.2892],
+    "경기 수원": [37.2636, 127.0286],
+    "경기 성남": [37.4200, 127.1266],
+    "강원 춘천": [37.8813, 127.7302],
+    "강원 원주": [37.3422, 127.9202],
+    "충북 청주": [36.6424, 127.4890],
+    "충남 천안": [36.8151, 127.1139],
+    "전북 전주": [35.8242, 127.1480],
+    "전남 목포": [34.8118, 126.3922],
+    "경북 포항": [36.0190, 129.3435],
+    "경남 창원": [35.2280, 128.6810],
+    "제주 제주시": [33.4996, 126.5312]
+}
 
-# 탭 UI
-info_tab, hospital_tab, map_tab = st.tabs(["🩺 응급 처치 가이드", "🏥 병원 현황", "🗺️ 지도 보기"])
+# 지역 선택
+region = st.sidebar.selectbox("📍 지역을 선택하세요", list(hospital_dict.keys()))
 
-with info_tab:
-    st.subheader("응급 처치 가이드")
-    st.info(treatment_guide[emergency_type])
+# 병원 데이터 생성 함수
+def generate_hospital_data(region):
+    hospitals = hospital_dict[region]
+    data = []
+    for h in hospitals:
+        data.append({
+            "병원명": h,
+            "응급실 가동률(%)": random.randint(30, 100),
+            "구급차 대기(대)": random.randint(0, 10),
+            "전문의 수": random.randint(5, 30)
+        })
+    return pd.DataFrame(data)
 
-with hospital_tab:
-    st.subheader(f"{region} 병원 현황")
-    st.dataframe(hospital_data, use_container_width=True)
+# 추천 병원 로직
+def recommend_hospital(df):
+    return df.sort_values(["응급실 가동률(%)", "구급차 대기(대)"], ascending=[True, True]).iloc[0]
 
-    chart = alt.Chart(hospital_data).mark_bar().encode(
-        x='병원명',
-        y='대기환자',
-        tooltip=['병원명','대기환자','가용병상']
-    ).properties(title="대기 환자 수 현황")
-    st.altair_chart(chart, use_container_width=True)
+# 탭 구성
+tabs = st.tabs(["🩺 응급처치 가이드", "🏥 병원 현황", "🗺️ 지도 보기"])
 
-    st.success(f"✅ 추천 병원: {recommended['병원명']} | 대기환자: {recommended['대기환자']}명 | 가용병상: {recommended['가용병상']}개")
+# 탭1: 응급처치 가이드
+with tabs[0]:
+    st.header("🩺 상황별 응급처치 가이드")
+    st.subheader("🔥 화상")
+    st.write("1도 화상은 흐르는 물에 10분 이상 식히고, 물집은 터뜨리지 않는다.")
+    st.subheader("💔 심정지")
+    st.write("119 신고 후 가슴 압박 30회, 인공호흡 2회를 반복한다.")
+    st.subheader("🤕 골절")
+    st.write("환자를 움직이지 말고 부목 등으로 고정한다.")
 
-with map_tab:
-    st.subheader("병원 위치 지도")
-    import pydeck as pdk
+# 탭2: 병원 현황
+with tabs[1]:
+    st.header(f"🏥 {region} 병원 현황")
+    df = generate_hospital_data(region)
+    st.dataframe(df)
+    rec = recommend_hospital(df)
+    st.success(f"✅ 추천 병원: {rec['병원명']} (응급실 가동률 {rec['응급실 가동률(%)']}%, 구급차 대기 {rec['구급차 대기(대)']}대)")
 
-    layer = pdk.Layer(
-        'ScatterplotLayer',
-        data=hospital_data,
-        get_position='[경도, 위도]',
-        get_radius=200,
-        get_fill_color=[0, 0, 255, 160],
-        pickable=True
-    )
-
-    # 추천 병원 강조
-    highlight = pdk.Layer(
-        'ScatterplotLayer',
-        data=pd.DataFrame([recommended]),
-        get_position='[경도, 위도]',
-        get_radius=400,
-        get_fill_color=[255, 0, 0, 200],
-        pickable=True
-    )
-
-    view_state = pdk.ViewState(latitude=hospital_data["위도"].mean(), longitude=hospital_data["경도"].mean(), zoom=10)
-    st.pydeck_chart(pdk.Deck(layers=[layer, highlight], initial_view_state=view_state))
+# 탭3: 지도 표시
+with tabs[2]:
+    st.header(f"🗺️ {region} 지도")
+    m = folium.Map(location=coordinates[region], zoom_start=13)
+    for idx, row in df.iterrows():
+        folium.Marker(
+            location=[coordinates[region][0] + random.uniform(-0.01, 0.01), coordinates[region][1] + random.uniform(-0.01, 0.01)],
+            popup=f"{row['병원명']} - 가동률: {row['응급실 가동률(%)']}%",
+            icon=folium.Icon(color="red" if row['병원명']==rec['병원명'] else "blue")
+        ).add_to(m)
+    st_folium(m, width=700, height=500)
