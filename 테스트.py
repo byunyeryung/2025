@@ -227,7 +227,7 @@ else:
 # -----------------------------
 # 탭 UI
 # -----------------------------
-info_tab, hospital_tab, map_tab = st.tabs(["🩺 응급 처치 가이드", "🏥 병원 현황"])
+info_tab, hospital_tab = st.tabs(["🩺 응급 처치 가이드", "🏥 병원 현황"])
 
 with info_tab:
     st.subheader(f"응급 처치 가이드 — {emergency_type}")
