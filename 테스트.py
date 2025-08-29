@@ -16,7 +16,7 @@ fortunes = [
 
 # Streamlit 앱
 st.set_page_config(page_title="오늘의 운세", page_icon="🔮")
-st.title("🔮 오늘의 운세")
+st.title("🔮 내일의 운세")
 
 st.write("당신의 운세를 확인해보세요!")
 
