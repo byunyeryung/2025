@@ -5,11 +5,9 @@ import altair as alt
 import pydeck as pdk
 import time
 
-st.set_page_config(page_title="스마트 응급 자원 배분 앱", layout="wide")
+st.set_page_config(page_title="응급 대응 방법과 지역별 병원 추천 시스템", layout="wide")   # 페이지 기본 설정
 
-# 제목
-st.title("🚑 스마트 응급 자원 배분 앱")
-st.markdown("### 보건 × 경영 융합 프로젝트")
+st.title("🚑 응급 대응 방법과 지역별 병원 추천 시스템")   # 제목
 
 # 지역 선택 (세분화 포함)
 regions = [
@@ -21,7 +19,7 @@ regions = [
     "전북 전주", "전남 목포", "경북 포항", "경남 창원", "제주 제주시"
 ]
 
-with st.sidebar:
+with st.sidebar:   # 사이드바: 사용자 입력 받기
     st.header("⚙️ 설정")
     region = st.selectbox("지역을 선택하세요", regions)
     emergency_type = st.selectbox(
@@ -30,28 +28,22 @@ with st.sidebar:
     )
     priority = st.radio("추천 기준", ["대기시간", "가용병상"])
 
-# -----------------------------
-# 더미 병원 데이터 생성
-# -----------------------------
-
-def generate_hospital_data(region, n=9):
+def generate_hospital_data(region, n=9):   # 더미 병원 데이터 생성
     np.random.seed(len(region))
     return pd.DataFrame({
-        "병원명": [f"{region} 병원 {i+1}" for i in range(n)],
-        "대기환자": np.random.randint(3, 80, n),
-        "가용병상": np.random.randint(2, 35, n),
-        "위도": np.random.uniform(34.5, 38.5, n),
-        "경도": np.random.uniform(126.0, 129.5, n)
+        "병원명": [f"{region} 병원 {i+1}" for i in range(n)],   # 병원명
+        "대기환자": np.random.randint(3, 80, n),                # 대기 중 환자 수
+        "가용병상": np.random.randint(2, 35, n),                # 남은 병상 수
+        "위도": np.random.uniform(34.5, 38.5, n),               # 위도
+        "경도": np.random.uniform(126.0, 129.5, n)              # 경도
     })
 
-hospital_data = generate_hospital_data(region)
+hospital_data = generate_hospital_data(region)   # 선택된 지역의 병원 데이터 생성
 
-# -----------------------------
-# 응급 처치 가이드 (상세 사전)
-# -----------------------------
+# 응급 처치 가이드
 GUIDES = {
     "심정지": {
-        "요약": "반응/호흡 확인 → 119 신고(스피커폰) → 즉시 흉부압박(분당 100~120회, 깊이 성인 5~6cm) → AED 지시 따름.",
+        "요약": "반응/호흡 확인 → 119 신고(스피커폰) → 즉시 흉부압박(분당 100-120회, 깊이 성인 5-6cm) → AED 지시 따름.",
         "주의": [
             "의식과 정상 호흡이 없으면 지체 없이 CPR 시작",
             "가능하면 주변인에게 AED 요청 및 119 통화 분담",
@@ -60,7 +52,7 @@ GUIDES = {
         "행동단계": [
             "안전 확인 후 어깨 두드리며 큰 소리로 반응 확인",
             "호흡 확인(보거나 느끼거나 듣기, 10초 이내) — 비정상/무호흡이면 즉시 119",
-            "흉부 중앙에 두 손을 겹쳐 수직으로 30회 압박(100~120회/분)",
+            "흉부 중앙에 두 손을 겹쳐 수직으로 30회 압박(100-120회/분)",
             "가능하면 기도 확보 후 인공호흡 2회(30:2 사이클). 불가 시 압박만 지속",
             "AED 도착 시 전원 ON → 패드 부착 → 음성 지시 따르기",
             "2분마다 호흡/맥박 재평가, 구급대 도착 전까지 계속"
@@ -86,8 +78,8 @@ GUIDES = {
         "행동단계": [
             "장갑 또는 비닐로 자가 보호 후 상처 확인",
             "상처 부위를 두껍게 덮고 강하게 눌러 지속 압박",
-            "출혈 계속 시 지혈대(사지) 상처 위 5~7cm 위치에 단단히 고정",
-            "의식 저하/창백/식은땀 등 쇼크 징후 관찰 및 다리 20~30cm 올리기(척추·머리 외상 의심 시 제외)"
+            "출혈 계속 시 지혈대(사지) 상처 위 5-7cm 위치에 단단히 고정",
+            "의식 저하/창백/식은땀 등 쇼크 징후 관찰 및 다리 20-30cm 올리기(척추·머리 외상 의심 시 제외)"
         ],
         "하지말것": [
             "깊이 박힌 이물(칼, 쇳조각 등)을 뽑지 않기—고정 후 병원 이송",
@@ -99,7 +91,7 @@ GUIDES = {
     },
     "골절": {
         "요약": "부목으로 관절 포함 고정, 불필요한 움직임 최소화. 개방성 골절은 덮고 지혈 후 신속 이송.",
-        "주의": ["CSM(혈류·감각·운동) 상태를 고정 전/후 확인", "돌출된 뼈는 밀어 넣지 않기", "냉찜질은 천으로 감싸서 10~15분"],
+        "주의": ["CSM(혈류·감각·운동) 상태를 고정 전/후 확인", "돌출된 뼈는 밀어 넣지 않기", "냉찜질은 천으로 감싸서 10-15분"],
         "행동단계": [
             "환자 안정, 손상 부위를 가능한 움직이지 않음",
             "부목/단단한 보조물로 손상 부위 양쪽 관절 포함 고정",
@@ -174,15 +166,11 @@ GUIDES = {
     }
 }
 
-# -----------------------------
-# 가이드 렌더링 함수
-# -----------------------------
-
-def render_guide(name: str):
+def render_guide(name: str):   # 응급 처치 가이드 렌더링 함수
     g = GUIDES[name]
     st.markdown(f"**요약**: {g['요약']}")
-
-    c1, c2, c3 = st.columns([1, 1.4, 1])
+    
+    c1, c2, c3 = st.columns([1, 1.4, 1])   # 3컬럼 레이아웃: 주의 / 행동단계 / 하지말것
     with c1:
         st.markdown("#### ⚠️ 주의")
         for x in g["주의"]:
@@ -195,85 +183,53 @@ def render_guide(name: str):
         st.markdown("#### ⛔ 하지 말 것")
         for x in g["하지말것"]:
             st.markdown(f"- {x}")
-
-    with st.expander("👶 연령별 팁 / 특이사항"):
+        
+    with st.expander("👶 연령별 팁 / 특이사항"):   # 연령별 팁
         tips = g.get("연령별팁", {})
         for k, arr in tips.items():
             st.markdown(f"**{k}**")
             for x in arr:
                 st.markdown(f"- {x}")
-
-    with st.expander("📞 언제 119에 신고할까?"):
+                
+    with st.expander("📞 언제 119에 신고할까?"):   # 언제 119에 신고해야 하는지
         for x in g["119"]:
             st.markdown(f"- {x}")
 
-    if name == "심정지":
-        with st.expander("⏱ CPR 2분 타이머 (데모)"):
+    if name == "심정지":   # 심정지의 경우 CPR 타이머 제공
+        with st.expander("⏱ CPR 2분 타이머"):
             if st.button("타이머 시작"):
-                ph = st.empty()
-                bar = st.progress(0)
-                for sec in range(120):
+                ph = st.empty()          # 경과 시간 표시
+                bar = st.progress(0)     # 진행바 표시
+                for sec in range(120):   # 120초 (2분)
                     bar.progress(int((sec + 1) / 120 * 100))
-                    ph.info(f"경과 {sec+1}초 • 압박 100~120회/분 • 2분마다 재평가")
-                    time.sleep(0.03)  # 데모용 가속
+                    ph.info(f"경과 {sec+1}초 • 압박 100~120회/분 • 2분마다 재평가")    
+                    time.sleep(1)        # 1초 대기
                 ph.success("2분 경과! 호흡/맥박 재평가 후 계속 진행")
 
-# -----------------------------
 # 추천 병원 선정
-# -----------------------------
 if priority == "대기시간":
-    recommended = hospital_data.sort_values("대기환자").iloc[0]
+    recommended = hospital_data.sort_values("대기환자").iloc[0]   # 대기환자 가장 적은 곳
 else:
-    recommended = hospital_data.sort_values("가용병상", ascending=False).iloc[0]
+    recommended = hospital_data.sort_values("가용병상", ascending=False).iloc[0]   # 가용병상 가장 많은 곳
 
-# -----------------------------
-# 탭 UI
-# -----------------------------
-info_tab, hospital_tab, map_tab = st.tabs(["🩺 응급 처치 가이드", "🏥 병원 현황", "🗺️ 지도 보기"])
+# 탭 UI 구성
+info_tab, hospital_tab = st.tabs(["🩺 응급 처치 가이드", "🏥 병원 현황"])
 
-with info_tab:
+with info_tab:   # 응급 처치 가이드 탭
     st.subheader(f"응급 처치 가이드 — {emergency_type}")
-    st.caption("ⓘ 실제 응급상황에서는 즉시 119에 신고하고 의료진 지시에 따르세요.")
     render_guide(emergency_type)
 
-with hospital_tab:
+with hospital_tab:   # 병원 현황 탭
     st.subheader(f"{region} 병원 현황")
-    st.dataframe(hospital_data, use_container_width=True)
+    st.dataframe(hospital_data, use_container_width=True)   # 병원 데이터 테이블
 
-    chart = alt.Chart(hospital_data).mark_bar().encode(
+    chart = alt.Chart(hospital_data).mark_bar().encode(   # Altair 바 차트: 병원별 대기 환자 수
         x='병원명',
         y='대기환자',
         tooltip=['병원명','대기환자','가용병상']
     ).properties(title="대기 환자 수 현황")
     st.altair_chart(chart, use_container_width=True)
 
-    st.success(
+    st.success(   # 추천 병원 출력
         f"✅ 추천 병원: {recommended['병원명']}  |  대기환자: {int(recommended['대기환자'])}명  |  가용병상: {int(recommended['가용병상'])}개"
     )
-
-with map_tab:
-    st.subheader("병원 위치 지도")
-    layer = pdk.Layer(
-        'ScatterplotLayer',
-        data=hospital_data,
-        get_position='[경도, 위도]',
-        get_radius=200,
-        get_fill_color=[0, 102, 255, 160],
-        pickable=True
-    )
-
-    highlight = pdk.Layer(
-        'ScatterplotLayer',
-        data=pd.DataFrame([recommended]),
-        get_position='[경도, 위도]',
-        get_radius=400,
-        get_fill_color=[255, 0, 0, 220],
-        pickable=True
-    )
-
-    view_state = pdk.ViewState(
-        latitude=float(hospital_data["위도"].mean()),
-        longitude=float(hospital_data["경도"].mean()),
-        zoom=10
-    )
-    st.pydeck_chart(pdk.Deck(layers=[layer, highlight], initial_view_state=view_state))
