@@ -213,7 +213,8 @@ def render_guide(name: str):
                 bar = st.progress(0)
                 for sec in range(120):
                     bar.progress(int((sec + 1) / 120 * 100))
-                    ph.info(f"경과 {sec+1}초 • 압박 100~120회/분 • 2분마다 재평가")
+                    ph.info(f"경과 {sec+1}초 • 압박 100~120회/분 • 2분마다 재평가")    
+                    time.sleep(1)  
                 ph.success("2분 경과! 호흡/맥박 재평가 후 계속 진행")
 
 # -----------------------------
