@@ -21,7 +21,7 @@ st.title("🔮 내일의 운세")
 st.write("당신의 운세를 확인해보세요!")
 
 # 사용자 입력
-name = st.text_input("이름을 입력해주세요", "")
+name = st.text_input("이름을 입력해", "")
 
 # 운세 보기 버튼
 if st.button("운세 보기"):
